@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlphaStart Program Health Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f5f4;
+    --color-text-primary: #111110;
+    --color-text-secondary: #57534e;
+    --color-text-tertiary: #a8a29e;
+    --color-border-secondary: #d6d3d1;
+    --color-border-tertiary: #e7e5e4;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1c1917;
+      --color-background-secondary: #292524;
+      --color-text-primary: #fafaf9;
+      --color-text-secondary: #a8a29e;
+      --color-text-tertiary: #78716c;
+      --color-border-secondary: #44403c;
+      --color-border-tertiary: #292524;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans); background: var(--color-background-primary); color: var(--color-text-primary); padding: 24px; max-width: 1100px; margin: 0 auto; }
+  .dash { padding: 1.5rem 0; }
+  .card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; }
+  .metric-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 1rem; }
+  .metric-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .metric-value { font-size: 26px; font-weight: 500; color: var(--color-text-primary); }
+  .metric-sub { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+  .score-bar-wrap { height: 6px; background: var(--color-border-tertiary); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .score-bar { height: 6px; border-radius: 3px; transition: width 0.4s ease; }
+  .filter-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 1.5rem; align-items: flex-end; }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-group label { font-size: 11px; color: var(--color-text-secondary); }
+  select { font-size: 13px; padding: 6px 10px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); min-width: 140px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+  .chart-wrap { position: relative; width: 100%; }
+  .divider { border: none; border-top: 0.5px solid var(--color-border-tertiary); margin: 1.5rem 0; }
+  .region-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .region-row:last-child { border-bottom: none; }
+  .region-name { font-size: 12px; font-weight: 500; color: var(--color-text-primary); min-width: 110px; }
+  .region-pill { font-size: 11px; min-width: 36px; text-align: right; font-weight: 500; }
+  .bar-track { flex: 1; height: 6px; background: var(--color-background-secondary); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 6px; border-radius: 3px; transition: width 0.4s ease; }
+  .no-data { color: var(--color-text-tertiary); font-size: 13px; font-style: italic; padding: 1.5rem 0; text-align: center; }
+  .tab-btn { font-size: 12px; padding: 5px 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; }
+  .tab-btn.active { background: var(--color-background-secondary); }
+  .delta-chip { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 3px; margin-left: 6px; }
+  .delta-up { background: #EAF3DE; color: #3B6D11; }
+  .delta-down { background: #FCEBEB; color: #A32D2D; }
+  .delta-flat { background: var(--color-background-secondary); color: var(--color-text-secondary); }
+  .section-label { font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 10px; }
+  .qoq-note { font-size: 11px; color: var(--color-text-tertiary); font-style: italic; margin-top: 10px; }
+  .hw-stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
+  .hw-stat { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px; }
+  .hw-stat-val { font-size: 22px; font-weight: 500; color: var(--color-text-primary); }
+  .hw-stat-lbl { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+  .hw-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .hw-row:last-child { border-bottom: none; }
+  .hw-label { font-size: 12px; color: var(--color-text-primary); min-width: 130px; }
+  .hw-bar-track { flex: 1; height: 8px; background: var(--color-background-secondary); border-radius: 4px; overflow: hidden; }
+  .hw-bar-fill { height: 8px; border-radius: 4px; background: #E24B4A; }
+  .hw-pct { font-size: 11px; font-weight: 500; min-width: 34px; text-align: right; }
+  .hw-count { font-size: 11px; color: var(--color-text-tertiary); min-width: 40px; text-align: right; }
+  @media (max-width: 640px) {
+    .grid3, .grid2 { grid-template-columns: 1fr; }
+    body { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="dash">
+
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;flex-wrap:wrap;gap:8px;">
+  <div>
+    <p style="font-size:18px;font-weight:500;color:var(--color-text-primary);">AlphaStart program health</p>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin-top:2px;">AlphaStart V2 · Q1 benchmark vs Q2 (Apr – May 2026)</p>
+  </div>
+  <span style="font-size:12px;color:var(--color-text-tertiary);padding-top:4px;">Updated May 28, 2026</span>
+</div>
+
+<div class="filter-row">
+  <div class="filter-group">
+    <label>Region / cluster</label>
+    <select id="filter-region">
+      <option value="all">All regions</option>
+      <option value="US/CAN">US / CAN</option>
+      <option value="UK/IRE/FIN">UK / IRE / FIN</option>
+      <option value="IND">India</option>
+      <option value="SGP">Singapore</option>
+    </select>
+  </div>
+  <div class="filter-group"><label>Department</label><select id="filter-dept"><option value="all">All departments</option></select></div>
+  <div class="filter-group"><label>Hire cohort</label><select id="filter-cohort"><option value="all">All cohorts</option></select></div>
+</div>
+
+<div class="grid3" style="margin-bottom:1.5rem;">
+  <div class="metric-card"><div class="metric-label">⚙ Operational health</div><div style="display:flex;align-items:baseline;gap:8px;"><div class="metric-value" id="ops-score">—</div><div id="ops-delta"></div></div><div class="metric-sub" id="ops-q1-line"></div><div class="score-bar-wrap"><div class="score-bar" id="ops-bar" style="background:#378ADD;"></div></div></div>
+  <div class="metric-card"><div class="metric-label">📚 Engagement health</div><div style="display:flex;align-items:baseline;gap:8px;"><div class="metric-value" id="eng-score">—</div><div id="eng-delta"></div></div><div class="metric-sub" id="eng-q1-line"></div><div class="score-bar-wrap"><div class="score-bar" id="eng-bar" style="background:#1D9E75;"></div></div></div>
+  <div class="metric-card"><div class="metric-label">🤝 Connection health</div><div style="display:flex;align-items:baseline;gap:8px;"><div class="metric-value" id="con-score">—</div><div id="con-delta"></div></div><div class="metric-sub" id="con-q1-line"></div><div class="score-bar-wrap"><div class="score-bar" id="con-bar" style="background:#7F77DD;"></div></div></div>
+</div>
+
+<div class="grid3" style="margin-bottom:1.5rem;">
+  <div class="metric-card"><div class="metric-label">Respondents</div><div class="metric-value" id="stat-n">—</div><div class="metric-sub">survey completions</div></div>
+  <div class="metric-card"><div class="metric-label">Hardware ready day 1</div><div class="metric-value" id="stat-hw">—</div><div class="metric-sub" id="stat-hw-sub"></div></div>
+  <div class="metric-card"><div class="metric-label">Benefits Q&A attended</div><div class="metric-value" id="stat-ben">—</div><div class="metric-sub" id="stat-ben-sub"></div></div>
+</div>
+
+<hr class="divider">
+
+<div class="card" style="margin-bottom:1.5rem;">
+  <div class="section-label">Quarter-over-quarter comparison</div>
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+    <button class="tab-btn active" onclick="setQoQMetric('all')" id="qbtn-all">All pillars</button>
+    <button class="tab-btn" onclick="setQoQMetric('ops')" id="qbtn-ops">Operational</button>
+    <button class="tab-btn" onclick="setQoQMetric('eng')" id="qbtn-eng">Engagement</button>
+    <button class="tab-btn" onclick="setQoQMetric('con')" id="qbtn-con">Connection</button>
+  </div>
+  <div class="chart-wrap" style="height:260px;"><canvas id="qoqChart"></canvas></div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;font-size:12px;color:var(--color-text-secondary);">
+    <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#B5D4F4;"></span>Q1 (benchmark)</span>
+    <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#378ADD;"></span>Q2 (current)</span>
+  </div>
+  <p class="qoq-note" id="qoq-region-note"></p>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="section-label" style="margin-bottom:10px;">Scores by region</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+      <button class="tab-btn active" onclick="setRegionMetric('ops')" id="rbtn-ops">Operational</button>
+      <button class="tab-btn" onclick="setRegionMetric('eng')" id="rbtn-eng">Engagement</button>
+      <button class="tab-btn" onclick="setRegionMetric('con')" id="rbtn-con">Connection</button>
+    </div>
+    <div id="region-bars"></div>
+  </div>
+  <div class="card">
+    <div class="section-label" style="margin-bottom:10px;">Scores by department</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+      <button class="tab-btn active" onclick="setDeptMetric('ops')" id="dbtn-ops">Operational</button>
+      <button class="tab-btn" onclick="setDeptMetric('eng')" id="dbtn-eng">Engagement</button>
+      <button class="tab-btn" onclick="setDeptMetric('con')" id="dbtn-con">Connection</button>
+    </div>
+    <div id="dept-bars"></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<div class="card" style="margin-bottom:1.5rem;">
+  <div class="section-label" style="margin-bottom:8px;">Score trend by hire cohort (Q2)</div>
+  <div class="chart-wrap" style="height:200px;"><canvas id="trendChart"></canvas></div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;font-size:12px;color:var(--color-text-secondary);">
+    <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#378ADD;"></span>Operational</span>
+    <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;"></span>Engagement</span>
+    <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#7F77DD;"></span>Connection</span>
+  </div>
+</div>
+
+<hr class="divider">
+
+<div class="card">
+  <div class="section-label" style="margin-bottom:4px;">Hardware issues explorer</div>
+  <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:14px;">Filter to explore hardware readiness issues by region, department, and cohort.</p>
+  <div class="filter-row" style="margin-bottom:1rem;">
+    <div class="filter-group"><label>Region</label><select id="hw-region"><option value="all">All regions</option><option value="US/CAN">US / CAN</option><option value="UK/IRE/FIN">UK / IRE / FIN</option><option value="IND">India</option><option value="SGP">Singapore</option></select></div>
+    <div class="filter-group"><label>Department</label><select id="hw-dept"><option value="all">All departments</option></select></div>
+    <div class="filter-group"><label>Cohort</label><select id="hw-cohort"><option value="all">All cohorts</option></select></div>
+  </div>
+  <div class="hw-stat-grid" id="hw-stats"></div>
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem;">
+    <div><p style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;">Issue rate by region</p><div id="hw-by-region"></div></div>
+    <div><p style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;">Issue rate by cohort</p><div id="hw-by-cohort"></div></div>
+  </div>
+  <div style="margin-top:1.25rem;"><p style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;">Issue rate by department</p><div id="hw-by-dept"></div></div>
+</div>
+
+</div>
+
+<script>
+const RAW=[
+  {hireDate:"4/7/2026",dept:"Sales Development",region:"UK/IRE/FIN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:4,q_continu:5,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/7/2026",dept:"Expert Insights",region:"UK/IRE/FIN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/7/2026",dept:"Marketing",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/14/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/7/2026",dept:"Revenue Operations",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/14/2026",dept:"Revenue Operations",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:null,q_continu:5,q_humanElement:3,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/14/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:5,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/14/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:3,q_liveDay1:3,q_benefitsQA:3,q_continu:3,q_humanElement:3,q_timeManagement:3,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/14/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:5,q_liveDay1:4,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/7/2026",dept:"Expert Insights",region:"UK/IRE/FIN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:3,q_continu:4,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"No",q_hardwareIssue:"Delayed – late hire, sorted by day 2"},
+  {hireDate:"4/21/2026",dept:"Sales Development",region:"SGP",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Customer Success",region:"UK/IRE/FIN",q_contentQuality:3,q_liveDay1:5,q_benefitsQA:3,q_continu:4,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Customer Success",region:"UK/IRE/FIN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Content",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:5,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Revenue Operations",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:2,q_hardwareReady:"No",q_hardwareIssue:"Equipment missing"},
+  {hireDate:"4/21/2026",dept:"Customer Success",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:4,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"No",q_hardwareIssue:"Computer not set up properly – IT resolved quickly"},
+  {hireDate:"4/21/2026",dept:"Customer Success",region:"US/CAN",q_contentQuality:5,q_liveDay1:1,q_benefitsQA:null,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Expert Insights",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:3,q_continu:4,q_humanElement:3,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Corporate Services, Technology, & Security",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:5,q_humanElement:3,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"People",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Content",region:"IND",q_contentQuality:5,q_liveDay1:4,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Content",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:null,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Revenue",region:"UK/IRE/FIN",q_contentQuality:5,q_liveDay1:4,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Sales - Financial Services",region:"UK/IRE/FIN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:3,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Expert Insights",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Marketing",region:"US/CAN",q_contentQuality:3,q_liveDay1:3,q_benefitsQA:5,q_continu:3,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Corporate Services, Technology, & Security",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:5,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Sales Development",region:"UK/IRE/FIN",q_contentQuality:3,q_liveDay1:3,q_benefitsQA:4,q_continu:3,q_humanElement:2,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/7/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:4,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Sales - Financial Services",region:"US/CAN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:3,q_continu:3,q_humanElement:4,q_timeManagement:2,q_hardwareReady:"No",q_hardwareIssue:"Monitor missing – everything else fine"},
+  {hireDate:"4/21/2026",dept:"Expert Insights",region:"US/CAN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:3,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"People",region:"US/CAN",q_contentQuality:5,q_liveDay1:4,q_benefitsQA:4,q_continu:5,q_humanElement:3,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/28/2026",dept:"Content",region:"IND",q_contentQuality:4,q_liveDay1:1,q_benefitsQA:5,q_continu:5,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Corporate Services, Technology, & Security",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/28/2026",dept:"Content",region:"IND",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:4,q_continu:4,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"No",q_hardwareIssue:"Monitor, keyboard, mouse and dock station pending"},
+  {hireDate:"4/28/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:null,q_continu:5,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"No",q_hardwareIssue:"Keyboard and mouse missing"},
+  {hireDate:"4/21/2026",dept:"Expert Insights",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Sales - Corporate",region:"US/CAN",q_contentQuality:3,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Sales - Corporate",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/7/2026",dept:"Product & Engineering",region:"UK/IRE/FIN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:4,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/28/2026",dept:"Content",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:4,q_continu:5,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"No",q_hardwareIssue:"Laptop received but peripherals not ready"},
+  {hireDate:"4/14/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:5,q_liveDay1:4,q_benefitsQA:4,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/5/2026",dept:"Corporate Services, Technology, & Security",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/5/2026",dept:"Sales - Financial Services",region:"UK/IRE/FIN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:5,q_continu:4,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/5/2026",dept:"Content",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:null,q_continu:4,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"No",q_hardwareIssue:"Delay in ordering peripherals"},
+  {hireDate:"5/5/2026",dept:"Compliance",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:null,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/5/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/1/2026",dept:"Product & Engineering",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/5/2026",dept:"Marketing",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:3,q_humanElement:4,q_timeManagement:3,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/28/2026",dept:"Content",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/5/2026",dept:"Content",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/5/2026",dept:"Sales - Financial Services",region:"UK/IRE/FIN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"No",q_hardwareIssue:"Laptop was faulty"},
+  {hireDate:"5/5/2026",dept:"Revenue Operations",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/5/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:2,q_liveDay1:2,q_benefitsQA:2,q_continu:2,q_humanElement:3,q_timeManagement:1,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/12/2026",dept:"People",region:"IND",q_contentQuality:5,q_liveDay1:1,q_benefitsQA:4,q_continu:5,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"No",q_hardwareIssue:"Monitor requested but out of stock"},
+  {hireDate:"5/5/2026",dept:"Expert Insights",region:"UK/IRE/FIN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:5,q_continu:4,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/12/2026",dept:"People",region:"IND",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:5,q_continu:4,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/12/2026",dept:"Revenue Operations",region:"IND",q_contentQuality:5,q_liveDay1:4,q_benefitsQA:4,q_continu:5,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Customer Success",region:"US/CAN",q_contentQuality:4,q_liveDay1:1,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/12/2026",dept:"Content",region:"IND",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:4,q_continu:5,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/12/2026",dept:"Content",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/12/2026",dept:"Revenue Operations",region:"IND",q_contentQuality:3,q_liveDay1:4,q_benefitsQA:3,q_continu:5,q_humanElement:3,q_timeManagement:4,q_hardwareReady:"No",q_hardwareIssue:"Monitor, mouse & headphones missing"},
+  {hireDate:"4/28/2026",dept:"Content",region:"IND",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/18/2026",dept:"Compliance",region:"US/CAN",q_contentQuality:3,q_liveDay1:3,q_benefitsQA:null,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Customer Success",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:null,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"No",q_hardwareIssue:"Mouse missing – still not received"},
+  {hireDate:"5/19/2026",dept:"Customer Success",region:"IND",q_contentQuality:3,q_liveDay1:5,q_benefitsQA:3,q_continu:4,q_humanElement:4,q_timeManagement:1,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Product & Engineering",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"No",q_hardwareIssue:"Entire cohort locked out of GitLab until Thursday"},
+  {hireDate:"5/19/2026",dept:"Sales Development",region:"UK/IRE/FIN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Sales Development",region:"SGP",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Customer Success",region:"IND",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:5,q_continu:4,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:4,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"No",q_hardwareIssue:"USB hub, keyboard, mouse, headphone, foot pedal all missing"},
+  {hireDate:"5/19/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"No",q_hardwareIssue:"Keyboard and monitor missing"},
+  {hireDate:"5/19/2026",dept:"Sales Development",region:"UK/IRE/FIN",q_contentQuality:5,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"No",q_hardwareIssue:"Laptop delayed due to DPD error"},
+  {hireDate:"5/19/2026",dept:"Product & Engineering",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:null,q_continu:5,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Customer Success",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Financial Data",region:"UK/IRE/FIN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"No",q_hardwareIssue:"Monitor and laptop missing"},
+  {hireDate:"5/19/2026",dept:"Revenue Operations",region:"IND",q_contentQuality:5,q_liveDay1:4,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Customer Success",region:"IND",q_contentQuality:5,q_liveDay1:1,q_benefitsQA:5,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Product & Engineering",region:"IND",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Sales Development",region:"UK/IRE/FIN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:3,q_continu:4,q_humanElement:3,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Sales Development",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"People",region:"IND",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"4/21/2026",dept:"Customer Success",region:"UK/IRE/FIN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:4,q_continu:4,q_humanElement:2,q_timeManagement:5,q_hardwareReady:"No",q_hardwareIssue:"Laptop login did not work day 1"},
+  {hireDate:"5/19/2026",dept:"Sales - Corporate",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:3,q_continu:4,q_humanElement:4,q_timeManagement:3,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Expert Insights",region:"US/CAN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:4,q_continu:5,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Customer Success",region:"UK/IRE/FIN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Expert Insights",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:5,q_continu:4,q_humanElement:5,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Expert Insights",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:null,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/5/2026",dept:"Expert Insights",region:"UK/IRE/FIN",q_contentQuality:4,q_liveDay1:5,q_benefitsQA:null,q_continu:5,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Product & Engineering",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:4,q_continu:4,q_humanElement:4,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Product & Engineering",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Expert Insights",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:5,q_continu:5,q_humanElement:5,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Expert Insights",region:"US/CAN",q_contentQuality:5,q_liveDay1:5,q_benefitsQA:null,q_continu:4,q_humanElement:4,q_timeManagement:5,q_hardwareReady:"Yes",q_hardwareIssue:""},
+  {hireDate:"5/19/2026",dept:"Corporate Services, Technology, & Security",region:"US/CAN",q_contentQuality:4,q_liveDay1:4,q_benefitsQA:null,q_continu:4,q_humanElement:3,q_timeManagement:4,q_hardwareReady:"Yes",q_hardwareIssue:""}
+];
+
+const Q1={global:{ops:4.4,eng:4.5,con:4.4},region:{"US/CAN":{ops:4.7,eng:4.5,con:4.6},"UK/IRE/FIN":{ops:3.7,eng:4.3,con:4.3},"IND":{ops:4.6,eng:4.6,con:4.3},"SGP":{ops:4.0,eng:4.3,con:4.1}}};
+function calcOps(r){const hw=r.q_hardwareReady==="Yes"?5:1;return(r.q_timeManagement+hw)/2;}
+function calcEng(r){return(r.q_contentQuality+r.q_continu)/2;}
+function calcCon(r){const v=[r.q_liveDay1,r.q_humanElement];if(r.q_benefitsQA!==null)v.push(r.q_benefitsQA);return v.reduce((a,b)=>a+b,0)/v.length;}
+function avg(arr){if(!arr.length)return null;return arr.reduce((a,b)=>a+b,0)/arr.length;}
+function scoreColor(v){if(v===null)return"#888";if(v>=4.5)return"#1D9E75";if(v>=3.5)return"#378ADD";return"#E24B4A";}
+function deltaChip(q2,q1){if(q2===null||q1===null)return"";const d=q2-q1;const sign=d>0?"+":"";const cls=d>0.04?"delta-up":d<-0.04?"delta-down":"delta-flat";return`<span class="delta-chip ${cls}">${sign}${d.toFixed(2)}</span>`;}
+function isDark(){const s=getComputedStyle(document.documentElement).getPropertyValue('--color-background-primary').trim();if(s==='#1c1917')return true;const m=window.matchMedia('(prefers-color-scheme: dark)');return m.matches;}
+function getLabelColor(){return isDark()?'#FFFFFF':'#111110';}
+
+const depts=[...new Set(RAW.map(r=>r.dept))].sort();
+const cohorts=[...new Set(RAW.map(r=>r.hireDate))].sort((a,b)=>new Date(a)-new Date(b));
+['filter-dept','hw-dept'].forEach(id=>{const s=document.getElementById(id);depts.forEach(d=>{const o=document.createElement('option');o.value=d;o.text=d;s.appendChild(o);});});
+['filter-cohort','hw-cohort'].forEach(id=>{const s=document.getElementById(id);cohorts.forEach(c=>{const o=document.createElement('option');o.value=c;o.text=c;s.appendChild(o);});});
+
+let regionMetric='ops',deptMetric='ops',qoqMetric='all',trendChart=null,qoqChart=null;
+
+function getFiltered(){const region=document.getElementById('filter-region').value,dept=document.getElementById('filter-dept').value,cohort=document.getElementById('filter-cohort').value;return RAW.filter(r=>(region==='all'||r.region===region)&&(dept==='all'||r.dept===dept)&&(cohort==='all'||r.hireDate===cohort));}
+function getHWFiltered(){const region=document.getElementById('hw-region').value,dept=document.getElementById('hw-dept').value,cohort=document.getElementById('hw-cohort').value;return RAW.filter(r=>(region==='all'||r.region===region)&&(dept==='all'||r.dept===dept)&&(cohort==='all'||r.hireDate===cohort));}
+
+function render(){
+  const data=getFiltered(),n=data.length,sel=document.getElementById('filter-region').value;
+  const opsAvg=avg(data.map(calcOps)),engAvg=avg(data.map(calcEng)),conAvg=avg(data.map(calcCon));
+  const q1ref=sel!=='all'&&Q1.region[sel]?Q1.region[sel]:Q1.global;
+  const q1Label=sel!=='all'&&Q1.region[sel]?sel+' Q1':'Global Q1';
+  document.getElementById('ops-score').textContent=opsAvg!==null?opsAvg.toFixed(2):'—';
+  document.getElementById('eng-score').textContent=engAvg!==null?engAvg.toFixed(2):'—';
+  document.getElementById('con-score').textContent=conAvg!==null?conAvg.toFixed(2):'—';
+  document.getElementById('ops-delta').innerHTML=deltaChip(opsAvg,q1ref.ops);
+  document.getElementById('eng-delta').innerHTML=deltaChip(engAvg,q1ref.eng);
+  document.getElementById('con-delta').innerHTML=deltaChip(conAvg,q1ref.con);
+  document.getElementById('ops-q1-line').textContent=q1Label+' benchmark: '+q1ref.ops.toFixed(1);
+  document.getElementById('eng-q1-line').textContent=q1Label+' benchmark: '+q1ref.eng.toFixed(1);
+  document.getElementById('con-q1-line').textContent=q1Label+' benchmark: '+q1ref.con.toFixed(1);
+  document.getElementById('ops-bar').style.width=opsAvg?((opsAvg/5)*100)+'%':'0%';
+  document.getElementById('eng-bar').style.width=engAvg?((engAvg/5)*100)+'%':'0%';
+  document.getElementById('con-bar').style.width=conAvg?((conAvg/5)*100)+'%':'0%';
+  document.getElementById('stat-n').textContent=n;
+  const hwYes=data.filter(r=>r.q_hardwareReady==="Yes").length;
+  document.getElementById('stat-hw').textContent=n?Math.round((hwYes/n)*100)+'%':'—';
+  document.getElementById('stat-hw-sub').textContent=hwYes+' of '+n+' respondents';
+  const benN=data.filter(r=>r.q_benefitsQA!==null).length;
+  document.getElementById('stat-ben').textContent=n?Math.round((benN/n)*100)+'%':'—';
+  document.getElementById('stat-ben-sub').textContent=benN+' of '+n+' respondents';
+  renderQoQ(data,q1ref,q1Label,sel);
+  renderRegionBars();renderDeptBars();renderTrend(data);
+}
+
+function makeLabelPlugin(){
+  const c=getLabelColor();
+  return{id:'dl',afterDatasetsDraw(chart){const ctx=chart.ctx;chart.data.datasets.forEach((ds,i)=>{const meta=chart.getDatasetMeta(i);meta.data.forEach((bar,j)=>{const val=ds.data[j];if(val===null||val===undefined)return;ctx.save();ctx.fillStyle=c;ctx.font='600 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(val.toFixed(2),bar.x,bar.y-4);ctx.restore();});});}};}
+
+function renderQoQ(data,q1ref,q1Label,sel){
+  const opsAvg=avg(data.map(calcOps)),engAvg=avg(data.map(calcEng)),conAvg=avg(data.map(calcCon));
+  document.getElementById('qoq-region-note').textContent=sel==='all'?'Showing global Q1 benchmark. Select a region to compare against regional Q1 scores.':Q1.region[sel]?'Comparing against '+sel+' Q1 benchmark.':'No regional Q1 benchmark available.';
+  if(qoqChart){qoqChart.destroy();qoqChart=null;}
+  const plugin=makeLabelPlugin();
+  const opts={responsive:true,maintainAspectRatio:false,layout:{padding:{top:28}},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.dataset?ctx.dataset.label+': ':''}${ctx.raw!==null?ctx.raw.toFixed(2):'—'}`}}},scales:{x:{ticks:{font:{size:12}},grid:{display:false}},y:{min:3,max:5.4,ticks:{stepSize:0.5,font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}}}};
+  if(qoqMetric==='all'){
+    qoqChart=new Chart(document.getElementById('qoqChart'),{type:'bar',plugins:[plugin],data:{labels:['Operational','Engagement','Connection'],datasets:[{label:'Q1',data:[q1ref.ops,q1ref.eng,q1ref.con],backgroundColor:'#B5D4F4',borderWidth:0,borderRadius:4},{label:'Q2',data:[opsAvg,engAvg,conAvg],backgroundColor:'#378ADD',borderWidth:0,borderRadius:4}]},options:opts});
+  } else {
+    const fnMap={ops:calcOps,eng:calcEng,con:calcCon},colMap={ops:'#378ADD',eng:'#1D9E75',con:'#7F77DD'};
+    qoqChart=new Chart(document.getElementById('qoqChart'),{type:'bar',plugins:[plugin],data:{labels:['Q1 benchmark','Q2 current'],datasets:[{data:[q1ref[qoqMetric],avg(data.map(fnMap[qoqMetric]))],backgroundColor:['#B5D4F4',colMap[qoqMetric]],borderWidth:0,borderRadius:4}]},options:opts});
+  }
+}
+
+function renderRegionBars(){
+  const regions=["US/CAN","UK/IRE/FIN","IND","SGP"],fn={ops:calcOps,eng:calcEng,con:calcCon}[regionMetric],col={ops:'#378ADD',eng:'#1D9E75',con:'#7F77DD'}[regionMetric];
+  let html='';
+  regions.forEach(r=>{const rData=RAW.filter(d=>d.region===r);if(!rData.length){html+=`<div class="region-row"><span class="region-name">${r}</span><span style="font-size:11px;color:var(--color-text-tertiary)">no data</span></div>`;return;}const v=avg(rData.map(fn));const q1v=Q1.region[r]?Q1.region[r][regionMetric]:null;html+=`<div class="region-row"><span class="region-name">${r}</span><div class="bar-track"><div class="bar-fill" style="width:${(v/5)*100}%;background:${col};"></div></div><span class="region-pill" style="color:${scoreColor(v)};">${v.toFixed(2)}</span>${q1v?deltaChip(v,q1v):''}</div>`;});
+  document.getElementById('region-bars').innerHTML=html;
+}
+
+function renderDeptBars(){
+  const fn={ops:calcOps,eng:calcEng,con:calcCon}[deptMetric],col={ops:'#378ADD',eng:'#1D9E75',con:'#7F77DD'}[deptMetric],deptMap={};
+  RAW.forEach(r=>{if(!deptMap[r.dept])deptMap[r.dept]=[];deptMap[r.dept].push(fn(r));});
+  const sorted=Object.entries(deptMap).map(([d,vals])=>({d,v:avg(vals)})).sort((a,b)=>b.v-a.v);
+  document.getElementById('dept-bars').innerHTML=sorted.map(({d,v})=>`<div class="region-row"><span class="region-name" style="font-size:11px;min-width:120px;">${d}</span><div class="bar-track"><div class="bar-fill" style="width:${(v/5)*100}%;background:${col};"></div></div><span class="region-pill" style="color:${scoreColor(v)};">${v.toFixed(2)}</span></div>`).join('');
+}
+
+function renderTrend(data){
+  const allCohorts=[...new Set(RAW.map(r=>r.hireDate))].sort((a,b)=>new Date(a)-new Date(b));
+  const opsD=[],engD=[],conD=[];
+  allCohorts.forEach(c=>{const cd=data.filter(r=>r.hireDate===c);opsD.push(cd.length?avg(cd.map(calcOps)):null);engD.push(cd.length?avg(cd.map(calcEng)):null);conD.push(cd.length?avg(cd.map(calcCon)):null);});
+  if(trendChart){trendChart.destroy();trendChart=null;}
+  trendChart=new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:allCohorts,datasets:[{label:'Operational',data:opsD,borderColor:'#378ADD',tension:0.3,pointRadius:4,fill:false,borderWidth:2,spanGaps:true},{label:'Engagement',data:engD,borderColor:'#1D9E75',tension:0.3,pointRadius:4,fill:false,borderWidth:2,spanGaps:true,borderDash:[4,4]},{label:'Connection',data:conD,borderColor:'#7F77DD',tension:0.3,pointRadius:4,fill:false,borderWidth:2,spanGaps:true,borderDash:[2,2]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw!==null?ctx.raw.toFixed(2):'—'}`}}},scales:{x:{ticks:{font:{size:11},maxRotation:45,autoSkip:false},grid:{color:'rgba(128,128,128,0.1)'}},y:{min:1,max:5,ticks:{stepSize:1,font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}}}}});
+}
+
+function renderHardwareExplorer(){
+  const data=getHWFiltered(),total=data.length,issues=data.filter(r=>r.q_hardwareReady==="No"),issueN=issues.length,issueRate=total?Math.round((issueN/total)*100):0;
+  document.getElementById('hw-stats').innerHTML=`<div class="hw-stat"><div class="hw-stat-val">${issueRate}%</div><div class="hw-stat-lbl">issue rate</div></div><div class="hw-stat"><div class="hw-stat-val">${issueN}</div><div class="hw-stat-lbl">reported issues</div></div><div class="hw-stat"><div class="hw-stat-val">${total}</div><div class="hw-stat-lbl">respondents in filter</div></div>`;
+  function renderBreakdown(id,key,items){const g={};items.forEach(r=>{const k=r[key];if(!g[k])g[k]={total:0,issues:0};g[k].total++;if(r.q_hardwareReady==="No")g[k].issues++;});const s=Object.entries(g).map(([k,v])=>({k,rate:v.total?v.issues/v.total:0,issues:v.issues,total:v.total})).sort((a,b)=>b.rate-a.rate);if(!s.length){document.getElementById(id).innerHTML='<p class="no-data">No data</p>';return;}document.getElementById(id).innerHTML=s.map(({k,rate,issues,total})=>{const pct=Math.round(rate*100);return`<div class="hw-row"><span class="hw-label">${k}</span><div class="hw-bar-track"><div class="hw-bar-fill" style="width:${pct}%;"></div></div><span class="hw-pct" style="color:${pct>30?'#A32D2D':pct>15?'#BA7517':'#3B6D11'};">${pct}%</span><span class="hw-count">${issues}/${total}</span></div>`;}).join('');}
+  renderBreakdown('hw-by-region','region',data);renderBreakdown('hw-by-dept','dept',data);
+  const cg={};data.forEach(r=>{if(!cg[r.hireDate])cg[r.hireDate]={total:0,issues:0};cg[r.hireDate].total++;if(r.q_hardwareReady==="No")cg[r.hireDate].issues++;});
+  const cs=Object.entries(cg).map(([k,v])=>({k,rate:v.total?v.issues/v.total:0,issues:v.issues,total:v.total})).sort((a,b)=>new Date(a.k)-new Date(b.k));
+  document.getElementById('hw-by-cohort').innerHTML=cs.length?cs.map(({k,rate,issues,total})=>{const pct=Math.round(rate*100);return`<div class="hw-row"><span class="hw-label">${k}</span><div class="hw-bar-track"><div class="hw-bar-fill" style="width:${pct}%;"></div></div><span class="hw-pct" style="color:${pct>30?'#A32D2D':pct>15?'#BA7517':'#3B6D11'};">${pct}%</span><span class="hw-count">${issues}/${total}</span></div>`;}).join(''):'<p class="no-data">No data</p>';
+}
+
+window.setQoQMetric=function(m){qoqMetric=m;['all','ops','eng','con'].forEach(k=>{const b=document.getElementById('qbtn-'+k);if(b)b.className='tab-btn'+(k===m?' active':'');});const data=getFiltered(),sel=document.getElementById('filter-region').value,q1ref=sel!=='all'&&Q1.region[sel]?Q1.region[sel]:Q1.global;renderQoQ(data,q1ref,sel!=='all'&&Q1.region[sel]?sel+' Q1':'Global Q1',sel);};
+window.setRegionMetric=function(m){regionMetric=m;['ops','eng','con'].forEach(k=>{const b=document.getElementById('rbtn-'+k);if(b)b.className='tab-btn'+(k===m?' active':'');});renderRegionBars();};
+window.setDeptMetric=function(m){deptMetric=m;['ops','eng','con'].forEach(k=>{const b=document.getElementById('dbtn-'+k);if(b)b.className='tab-btn'+(k===m?' active':'');});renderDeptBars();};
+['filter-region','filter-dept','filter-cohort'].forEach(id=>document.getElementById(id).addEventListener('change',render));
+['hw-region','hw-dept','hw-cohort'].forEach(id=>document.getElementById(id).addEventListener('change',renderHardwareExplorer));
+render();renderHardwareExplorer();
+</script>
+</body>
+</html>
